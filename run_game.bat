@@ -1,0 +1,1 @@
+halite.exe -d "240 160" "python MyBot.py" "python ../halite2-master_kindanoob/halite2-master/MyBot.py"
