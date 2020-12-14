@@ -16,17 +16,16 @@ import tensorflow as tf
 from tensorflow import keras
 from keras.models import load_model
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, Flatten
+from keras.layers import Dense, Dropout
 from keras.layers import Conv1D, GlobalAveragePooling1D, MaxPooling1D
 from keras.layers import BatchNormalization
 from keras.losses import CategoricalCrossentropy
 
 
-class CNN_Net(object):
-    FIRST_LAYER_FILTERS = 32
-    FIRST_LAYER_KERNEL = 3
-    SECOND_LAYER_FILTERS = 64
-    SECOND_LAYER_KERNEL = 3
+class Deep_FC_Net(object):
+    FIRST_LAYER_N = 256
+    SECOND_LAYER_N = 256
+    THIRD_LAYER_N = 128
 
     def __init__(self, input_size: Tuple[int, int], output_size: int,
                  cached_model: bool, cached_model_path: str, seed=None):
@@ -47,17 +46,15 @@ class CNN_Net(object):
     def create_model(self, input_size: Tuple[int, int], output_size: int,
                      loss: Union[str, Any], optimizer: str, metrics: List[str],
                     verbose: bool):
-
         model = Sequential()
-        model.add(Conv1D(self.FIRST_LAYER_FILTERS, self.FIRST_LAYER_KERNEL,
-                         activation='relu', input_shape=input_size))
+        model.add(Dense(self.FIRST_LAYER_N, input_shape=(input_size[0]*input_size[1],), activation='relu'))
         model.add(BatchNormalization())
-        model.add(MaxPooling1D())
-        model.add(Conv1D(self.SECOND_LAYER_FILTERS, self.SECOND_LAYER_KERNEL,
-                         activation='relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(self.SECOND_LAYER_N, activation='relu'))
         model.add(BatchNormalization())
-        model.add(MaxPooling1D())
-        model.add(Flatten())
+        model.add(Dropout(0.5))
+        model.add(Dense(self.THIRD_LAYER_N, activation='relu'))
+        model.add(BatchNormalization())
         model.add(Dropout(0.5))
         model.add(Dense(output_size, activation='sigmoid'))
         if verbose:
@@ -74,6 +71,7 @@ class CNN_Net(object):
     def train(self, input_train, target_train, validation_split: float,
               n_epochs: int, batch_size: int, verbose: int,
               model_version: str)-> NoReturn:
+        input_train = input_train.reshape(-1, input_train.shape[1]*input_train.shape[2])
         print(f"Input features shape: {input_train.shape}")
         print(f"output targets shape: {target_train.shape}")
 
@@ -91,11 +89,11 @@ class CNN_Net(object):
         hist_df = pd.DataFrame(history.history, columns=self._metrics + ["val_" + m for m in self._metrics] + ['loss', 'val_loss'])
         hist_df = hist_df.reset_index(col_fill='epoch')
         fig = hist_df.plot(x='index', y=['loss', 'val_loss']).get_figure()
-        curve_path = os.path.join(current_directory, os.path.pardir, "models", "training_plot.png")
+        curve_path = os.path.join(current_directory, os.path.pardir, "models", "fdc_training_plot.png")
         fig.savefig(curve_path)
 
         # Save model
-        self.save(model_save_fn="cnn_model_" + model_version + ".hd5")
+        self.save(model_save_fn="dfc_model_" + model_version + ".hd5")
 
 
     def predict(self, input_data):
@@ -105,5 +103,5 @@ class CNN_Net(object):
 
 
     def save(self, model_save_path="../models",
-             model_save_fn="cnn_model.hd5"):
+             model_save_fn="dfc_model.hd5"):
         self._model.save(os.path.join(model_save_path, model_save_fn))

@@ -48,6 +48,15 @@ class Map:
         """
         return list(self._players.values())
 
+    def all_ships(self):
+        """
+        :return: list of all enemies ships in game
+        """
+        all_ships = []
+        for player in self.all_players():
+            all_ships.extend(player.all_ships())
+        return all_ships
+
     def enemies_ships(self):
         """
         :return: list of all enemies ships in game

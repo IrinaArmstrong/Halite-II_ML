@@ -12,10 +12,11 @@ warnings.simplefilter("ignore", category=RuntimeWarning)
 import numpy as np
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '99' #99
-from tsmlstarterbot.parsing import parse, load_parsed
 from tsmlstarterbot.cnn_net_model import CNN_Net
+from tsmlstarterbot.deep_fc_net import Deep_FC_Net
+from tsmlstarterbot.feature_generation import load_parsed
+from tsmlstarterbot.parsing import parse
 from tsmlstarterbot.common import *
-
 
 def fetch_data_dir(directory, limit):
     """
@@ -97,18 +98,23 @@ def main():
         np.random.seed(args.seed)
 
     # Redirect sys.stdout to the file
-    stderr_fn = sys.stderr
-    stdout_fn = sys.stdout
-    sys.stdout = open('./LogSTDOUT.txt', 'w')
-    sys.stdout = open('./LogSTDERR.txt', 'w')
+    # stderr_fn = sys.stderr
+    # stdout_fn = sys.stdout
+    # sys.stdout = open('./LogSTDOUT.txt', 'w')
+    # sys.stdout = open('./LogSTDERR.txt', 'w')
+
 
     net = CNN_Net(input_size=input_data_size, output_size=PLANET_MAX_NUM,
                   cached_model=args.cache, cached_model_path="", seed=args.seed)
+    # net = Deep_FC_Net(input_size=input_data_size, output_size=PLANET_MAX_NUM,
+    #               cached_model=args.cache, cached_model_path="", seed=args.seed)
 
-    sys.stdout.close()
-    sys.stderr.close()
-    sys.stderr = stderr_fn
-    sys.stdout = stdout_fn
+    # sys.stdout.close()
+    # sys.stderr.close()
+    # sys.stderr = stderr_fn
+    # sys.stdout = stdout_fn
+    # os.remove("./LogSTDOUT.txt")
+    # os.remove("./LogSTDERR.txt")
 
     net.train(data_input, data_output, validation_split = 0.2, n_epochs=20,
               batch_size=100, verbose=1, model_version="v0")

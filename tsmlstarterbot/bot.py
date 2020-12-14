@@ -7,8 +7,10 @@ import logging
 import numpy as np
 
 # Disable stderr to import Keras and Tensorflow without breaking game server
+from tsmlstarterbot.feature_generation import PlanetFeature
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '99' #99
-logging.basicConfig(filename='mybot.log', level=logging.DEBUG)
+logging.basicConfig(filename='mybot.log', level=logging.INFO)
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -16,12 +18,15 @@ warnings.filterwarnings("ignore")
 import hlt
 from hlt.structs import Struct
 from tsmlstarterbot.common import *
+from hlt.constants import *
 from hlt.game_map import get_centroid
 from tsmlstarterbot.cnn_net_model import CNN_Net
+from tsmlstarterbot.deep_fc_net import Deep_FC_Net
+from tsmlstarterbot.rush import *
 
 
 class Bot:
-    def __init__(self, models_location="../models/cnn_model_v0.hd5", bots_name="Victory_v0"):
+    def __init__(self, models_location="../models/cnn_model_v0.hd5", bots_name="Victory_v1"):
         # Redirect sys.stdout to the file
         stderr_fn = sys.stderr
         stdout_fn = sys.stdout
@@ -34,6 +39,10 @@ class Bot:
                                    output_size=PLANET_MAX_NUM, cached_model=True,
                                    cached_model_path=os.path.join(self._current_directory, models_location),
                                    seed=11)
+        # self._neural_net = Deep_FC_Net(input_size=(PLANET_MAX_NUM, PER_PLANET_FEATURES),
+        #                                output_size=PLANET_MAX_NUM, cached_model=True,
+        #                                cached_model_path=os.path.join(self._current_directory, models_location),
+        #                                seed=11)
         sys.stdout.close()
         sys.stderr.close()
         sys.stderr = stderr_fn
@@ -42,8 +51,6 @@ class Bot:
         # Run prediction on random data to make sure that code path is executed at least once before the game starts
         random_input_data = np.random.rand(1, PLANET_MAX_NUM, PER_PLANET_FEATURES)
         predictions = self._neural_net.predict(random_input_data)
-
-
 
         assert predictions.shape[1] == PLANET_MAX_NUM
 
@@ -71,9 +78,9 @@ class Bot:
 
             # Calculate centroids (0<centX<1, 0<centY<1)
             # My flying ships
-            centroid_me = get_centroid(S.my.undocked, game.map.width, game.map.height)
+            # centroid_me = get_centroid(S.my.undocked, game.map.width, game.map.height)
             # Enemy N's flying ships
-            centroid_enemies = get_centroid(S.enemies.undocked, game.map.width, game.map.height)
+            # centroid_enemies = get_centroid(S.enemies.undocked, game.map.width, game.map.height)
 
             logging.debug('Structuring ended: {}'.format(time.time() - start_time))
 
@@ -81,12 +88,40 @@ class Bot:
             timeout_lim = 1.9 - len(S.my.all) / 1000
 
             # Produce features for each planet.
-            features = self.produce_features_per_planet(game_map)
+            features = self.produce_more_features_per_planet(game_map)
 
             # Find predictions which planets we should send ships to.
             # predictions shape: [1, PER_PLANET_FEATURES] -> [1, 11]
             predictions = np.squeeze(self._neural_net.predict(features))
             logging.debug('Predictions type: {} and shape: {}'.format(type(predictions), predictions.shape))
+
+            # planets = game_map.all_planets()
+            # my_ships = [ship for ship in game_map.all_ships() if ship.owner == game_map.get_me()]
+            # enemy_ships = [ship for ship in game_map.all_ships() if ship.owner != game_map.get_me()]
+            # my_ships_to_planets_map = {planet.id: 0 for planet in planets}
+            #
+            # is_rush_possible = find_is_rush_possible(game_map, game_map.all_planets(), my_ships, enemy_ships)
+            # logging.debug('Turn #: {} rush possible: {}'.format(turn, is_rush_possible))
+            #
+            # if is_rush_possible:
+            #     num_players = len(game_map.all_players())
+            #     corners = GameMapCorners(game_map)
+            #     game_map_center = hlt.entity.Position(game_map.width / 2, game_map.height / 2)
+            #     enemy_dist_to_center_turn_zero = enemy_ships[0].calculate_distance_between(game_map_center)
+            #     closer_to_me_planets = PlanetsCloserToMeThanToEnemy(planets, my_ships[0], enemy_ships[0])
+            #     initial_planet_choice_2p = InitialPlanetChoice2p(game_map, closer_to_me_planets, my_ships,
+            #                                                      my_ships_to_planets_map, enemy_ships)
+            #
+            #     if turn == 0:
+            #         command_queue = RushFirstTurn(my_ships, enemy_ships)
+            #     else:
+            #         command_queue = RushStrategy(turn, game_map, num_players, planets, rush_target_player_4p,
+            #                                      my_ships, my_docked_ships, my_undocked_ships,
+            #                                      enemy_ships, enemy_docked_ships, enemy_undocked_ships,
+            #                                      my_ships_targets, my_ships_positions_next_turn,
+            #                                      my_ships_to_planets_map,
+            #                                      turn_start_time, enemy_contact_rush_prev_turn)
+
 
             # Use simple greedy algorithm to assign closest ships to each planet according to predictions.
             ships_to_planets_assignment = self.produce_ships_to_planets_assignment(game_map, S, P, predictions,
@@ -97,6 +132,81 @@ class Bot:
 
             # Send the command.
             game.send_command_queue(instructions)
+            turn += 1
+
+
+    def find_closest_ship_distance(self, planet, ships):
+        if len(ships) == 0:
+            return 1000, None
+        distances = [distance(ship.x, ship.y, planet.x, planet.y) for ship in ships]
+        return np.min(distances), ships[np.argmin(distances)]
+
+
+    def find_gravity(self, planet, ships):
+        gravity = 0
+        ships_health = 0
+        health_weighted_ship_distance = 0
+        for ship in ships:
+            d = distance(ship.x, ship.y, planet.x, planet.y)
+            ships_health += ship.health
+            health_weighted_ship_distance += d * ship.health
+            gravity += ship.health / (d * d)
+
+        if len(ships) > 0:
+            health_weighted_ship_distance = health_weighted_ship_distance / ships_health
+        return gravity, health_weighted_ship_distance
+
+
+    def produce_more_features_per_planet(self, game_map):
+        """
+        For each planet produce a set of features that we will feed to the neural net. We always return an array
+        with PLANET_MAX_NUM rows - if planet is not present in the game, we set all featurse to 0.
+
+        :param game_map: game map
+        :return: 2-D array where i-th row represents set of features of the i-th planet
+        """
+        center = (game_map.width / 2, game_map.height / 2)
+
+        # 1) Split planets to friendly, enemies and empty
+        # planets_empty = [planet for planet in game_map.all_planets() if not planet.is_owned()]
+        # planets_friendly = [planet for planet in game_map.all_planets() if planet.owner == game_map.get_me()]
+        # planets_enemies = [planet for planet in game_map.all_planets() if planet.owner != game_map.get_me()]
+
+        # 2) Split ships
+        friendly_ships = [ship for ship in game_map.all_ships() if ship.owner == game_map.my_id]
+        enemy_ships = [ship for ship in game_map.all_ships() if ship.owner != game_map.my_id]
+
+        # 3) Create planets features: 15
+        planets_features = np.zeros((1, PLANET_MAX_NUM, PER_PLANET_FEATURES))
+
+        for planet in game_map.all_planets():
+            if planet.owner == game_map.get_me():
+                planets_features[0, planet.id, PlanetFeature.owner] = 1   # me
+            elif planet.owner is None:
+                planets_features[0, planet.id, PlanetFeature.owner] = 0  # not owned
+            else:
+                planets_features[0, planet.id, PlanetFeature.owner] = -1  # not me
+
+            planets_features[0, planet.id, PlanetFeature.is_active] = 0 if planet.is_full() else 1
+            planets_features[0, planet.id, PlanetFeature.health] = planet.health
+            planets_features[0, planet.id, PlanetFeature.production] = planet.current_production
+            planets_features[0, planet.id, PlanetFeature.exists] = 1 if planet.health > 0 else 0
+            planets_features[0, planet.id, PlanetFeature.docked_ships] = planet.num_docked
+            planets_features[0, planet.id, PlanetFeature.remaining_production] = planet.remaining_resources
+            planets_features[0, planet.id, PlanetFeature.distance_from_center] = distance(planet.x, planet.y,
+                                                                                            center[0], center[1])
+            fdist, _ = self.find_closest_ship_distance(planet, friendly_ships)
+            planets_features[0, planet.id, PlanetFeature.friendly_ship_distance] = fdist
+            edist, _ = self.find_closest_ship_distance(planet, enemy_ships)
+            planets_features[0, planet.id, PlanetFeature.enemy_ship_distance] = edist
+            fgravity, health_weighted_fdist = self.find_gravity(planet, friendly_ships)
+            egravity, health_weighted_edist = self.find_gravity(planet, enemy_ships)
+            planets_features[0, planet.id, PlanetFeature.health_weighted_friendly_ship_distance] = health_weighted_fdist
+            planets_features[0, planet.id, PlanetFeature.health_weighted_enemy_ship_distance] = health_weighted_edist
+            planets_features[0, planet.id, PlanetFeature.friendly_gravity] = fgravity
+            planets_features[0, planet.id, PlanetFeature.enemy_gravity] = egravity
+
+        return planets_features
 
 
 
@@ -292,6 +402,46 @@ class Bot:
             navigate_command = ship.thrust(speed, ship.calculate_angle_between(destination))
         return navigate_command
 
+
+def planet_closest_to_ships(planets, ships):
+    closest_planet = None
+    min_dist = 10000
+    for planet in planets:
+        dist = min([planet.calculate_distance_between(ship[1]) for ship in ships])
+        if dist < min_dist:
+            min_dist = dist
+            closest_planet = planet
+    return (closest_planet, min_dist)
+
+
+def find_is_rush_possible(game_map, planets, my_ships, enemy_ships):
+    """
+    Finding out if it promising for winning ro rush the opponent.
+    :return: True if it is profitable to try rush opponent
+    """
+    if not IS_RUSH_ENABLED:
+        return False
+    if (len(my_ships) == 0) or (len(enemy_ships) == 0):
+        return False
+    initial_dist = my_ships[0].calculate_distance_between(enemy_ships[0])
+    if initial_dist < RUSH_IS_POSSIBLE_DIST:
+        return True
+    logging.warning('Low with time in navigation: {}'.format(have_time))
+    (planet_closest_to_enemy, enemy_dist) = planet_closest_to_ships(planets, enemy_ships)
+    my_dist_to_planet = my_ships[0].calculate_distance_between(planet_closest_to_enemy)
+    my_dist_to_enemy = my_ships[0].calculate_distance_between(enemy_ships[0])
+    if my_dist_to_enemy < my_dist_to_planet:
+        return False
+    enemy_dist = enemy_ships[0].calculate_distance_between(planet_closest_to_enemy)
+    my_dist = my_ships[0].calculate_distance_between(planet_closest_to_enemy)
+    r = planet_closest_to_enemy.radius
+
+    #Here plus one is for my turn 0, on which the rush formation is created
+    my_time = (my_dist - r + 6) // 7 + 1
+    enemy_time = (enemy_dist - r + 6) // 7
+    is_rush_possible = (my_time  - enemy_time < 11)
+    return is_rush_possible
+
 if __name__ == "__main__":
-    bot = Bot()
+    bot = Bot() #models_location="../models/cnn_model_v0.hd5"
     bot.play()
