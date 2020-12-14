@@ -103,7 +103,7 @@ def main():
     # sys.stdout = open('./LogSTDOUT.txt', 'w')
     # sys.stdout = open('./LogSTDERR.txt', 'w')
 
-
+    #
     net = CNN_Net(input_size=input_data_size, output_size=PLANET_MAX_NUM,
                   cached_model=args.cache, cached_model_path="", seed=args.seed)
     # net = Deep_FC_Net(input_size=input_data_size, output_size=PLANET_MAX_NUM,
