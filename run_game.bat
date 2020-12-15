@@ -1,1 +1,1 @@
-halite.exe -d "240 160" "python MyBot.py" "python ../Halite2_ML_Bot_v2_repo/MyBot.py"
+halite.exe -d "240 160" "python MyBot.py" "python ../Halite2_ML-StarterBot-Python_Windows/MyBot.py"

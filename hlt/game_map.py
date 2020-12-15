@@ -48,21 +48,21 @@ class Map:
         """
         return list(self._players.values())
 
-    def all_ships(self):
-        """
-        :return: list of all enemies ships in game
-        """
-        all_ships = []
-        for player in self.all_players():
-            all_ships.extend(player.all_ships())
-        return all_ships
-
     def enemies_ships(self):
         """
         :return: list of all enemies ships in game
         """
         all_ships = []
         for player in [p for p in self.all_players() if p.id != self.my_id]:
+            all_ships.extend(player.all_ships())
+        return all_ships
+
+    def friendly_ships(self):
+        """
+        :return: list of all friendly (my) ships in game
+        """
+        all_ships = []
+        for player in [p for p in self.all_players() if p.id == self.my_id]:
             all_ships.extend(player.all_ships())
         return all_ships
 
@@ -100,7 +100,7 @@ class Map:
         result = np.array(sorted(result.items(), key=lambda t: t[1][0]), dtype=object)[1:]
         return result
 
-    def sort_entities(self) -> List[Struct]:
+    def sort_ent_intersects_entityities(self) -> List[Struct]:
         """
         Create structured hierarchy of game entities.
         """

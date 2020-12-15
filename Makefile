@@ -10,7 +10,7 @@ HALITE_BINARY_ADDRESS=https://halite.io/assets/downloads/Halite2_MacOS.zip
 SEED=15485863
 
 SOURCES_FOR_TRAINING= tsmlstarterbot/common.py \
-	tsmlstarterbot/cnn_net_model.py tsmlstarterbot/parsing.py \
+	tsmlstarterbot/neural_net.py tsmlstarterbot/parsing.py \
 	tsmlstarterbot/train.py
 
 default: model_long_training
