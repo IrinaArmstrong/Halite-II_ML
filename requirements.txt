@@ -1,15 +1,14 @@
-bleach==1.5.0
-cycler==0.10.0
-html5lib==0.9999999
-Markdown==2.6.9
-numpy==1.13.3
-pandas==0.20.3
-protobuf==3.4.0
-pyparsing==2.2.0
-python-dateutil==2.6.1
-pytz==2017.2
-six==1.11.0
-tensorflow==1.13.1
-tensorflow-tensorboard==0.1.8
-Werkzeug==0.12.2
-matplotlib==2.1.0
+h5py==2.10.0
+Keras==2.4.3
+Keras-Applications==1.0.8
+Keras-Preprocessing==1.1.2
+Markdown==3.3.3
+matplotlib @ file:///D:/bld/matplotlib-suite_1605180495775/work
+numpy==1.18.5
+pandas @ file:///D:/bld/pandas_1604166721606/work
+PyQt5==5.12.3
+tensorboard==2.4.0
+tensorboardX==2.1
+tensorflow==2.3.1
+tensorflow-estimator==2.3.0
+tqdm==4.54.1

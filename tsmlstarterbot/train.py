@@ -110,7 +110,7 @@ def main():
     sys.stderr = stderr_fn
     sys.stdout = stdout_fn
 
-    net.train(data_input, data_output, validation_split = 0.2, n_epochs=20,
+    net.train(data_input, data_output, validation_split = 0.2, n_epochs=28,
               batch_size=100, verbose=1, model_version="v0")
 
 
